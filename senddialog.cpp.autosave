@@ -406,8 +406,10 @@ void sendDialog::on_buttonBox_clicked(QAbstractButton *button)
 
     if(sftp_mk_file(my_ssh_session, filepath)==SSH_OK)
     {
-          cout<<"read successfully"<<endl;
-        }
+          cout<<"mkfile successfully"<<endl;
+        }else{
+        
+    }
 
     if(sftp_read_sync(my_ssh_session,"helloworld/helloworld.txt","/tmp/helloworld.txt")==SSH_OK){
           cout<<"read successfully"<<endl;

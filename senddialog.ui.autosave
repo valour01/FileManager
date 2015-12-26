@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>456</width>
-    <height>290</height>
+    <height>343</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,7 +17,7 @@
    <property name="geometry">
     <rect>
      <x>200</x>
-     <y>230</y>
+     <y>280</y>
      <width>180</width>
      <height>30</height>
     </rect>
@@ -39,7 +39,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Username</string>
+    <string>Hostname</string>
    </property>
   </widget>
   <widget class="QLabel" name="label_2">
@@ -52,7 +52,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Email</string>
+    <string>Username</string>
    </property>
   </widget>
   <widget class="QLabel" name="label_3">
@@ -65,7 +65,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Address</string>
+    <string>Password</string>
    </property>
   </widget>
   <widget class="QLabel" name="label_4">
@@ -78,7 +78,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>File Path</string>
+    <string>Port</string>
    </property>
   </widget>
   <widget class="QLabel" name="label_5">
@@ -91,7 +91,7 @@
     </rect>
    </property>
    <property name="text">
-    <string>Password</string>
+    <string>Filepath</string>
    </property>
   </widget>
   <widget class="QLineEdit" name="lineEdit">
@@ -142,6 +142,29 @@
      <width>231</width>
      <height>31</height>
     </rect>
+   </property>
+  </widget>
+  <widget class="QLineEdit" name="lineEdit_6">
+   <property name="geometry">
+    <rect>
+     <x>150</x>
+     <y>220</y>
+     <width>231</width>
+     <height>31</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_6">
+   <property name="geometry">
+    <rect>
+     <x>40</x>
+     <y>220</y>
+     <width>80</width>
+     <height>30</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Email</string>
    </property>
   </widget>
  </widget>

@@ -41,3 +41,8 @@ FORMS    += mainwindow.ui \
 
 RESOURCES += \
     menu.qrc
+
+LIBS += -L/usr/lib/x86_64-linux-gnu/ -lssh
+
+
+

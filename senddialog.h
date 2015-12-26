@@ -2,6 +2,7 @@
 #define SENDDIALOG_H
 
 #include <QDialog>
+#include <QAbstractButton>
 
 namespace Ui {
 class sendDialog;
@@ -14,6 +15,9 @@ class sendDialog : public QDialog
 public:
     explicit sendDialog(QWidget *parent = 0);
     ~sendDialog();
+
+private slots:
+    void on_buttonBox_clicked(QAbstractButton *button);
 
 private:
     Ui::sendDialog *ui;
