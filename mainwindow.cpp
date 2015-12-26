@@ -34,6 +34,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect(this,SIGNAL(SignalsetFileName(char*)),&Input,SLOT(setFileName(char*)));
     QObject::connect(this,SIGNAL(SignalsetOldName(QString)),&Input,SLOT(setOldName(QString)));
     QObject::connect(this,SIGNAL(SignalsetStat(QString)),&atrribute,SLOT(setStat(QString)));
+    QObject::connect(this,SIGNAL(SignalsetStat(QString)),&send,SLOT(setStat(QString)));
 }
 
 MainWindow::~MainWindow()
@@ -853,6 +854,11 @@ void MainWindow::on_Send_clicked()
          QMessageBox::information(this,"Error","Please choose the item. ",QMessageBox::Yes,QMessageBox::Yes);
          return;
     }
+    QString fname = item->text();
+    QStringList tmp = fname.split("\t");
+    QString fname1 = tmp.at(1)+tmp.at(0);
+    emit SignalsetStat(fname1);
+    send.showMsg();
     send.show();
 }
 

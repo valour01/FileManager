@@ -415,3 +415,22 @@ void sendDialog::on_buttonBox_clicked(QAbstractButton *button)
 
 
 }
+
+void sendDialog::showMsg()
+{
+    super:
+    QStringList tmp = this->sendName.split("/");
+    QString path = "";
+    int num = tmp.count() - 1;
+    for(int i = 1; i<num; i++)
+    {
+        path = path + "/" + tmp.at(i);
+    }
+    QString fname = tmp.at(num);
+    ui->property->setText(path+"/"+fname);
+}
+
+void sendDialog::setStat(QString name)
+{
+    this->sendName = name;
+}
