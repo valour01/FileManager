@@ -294,6 +294,10 @@
    <addaction name="action_S"/>
    <addaction name="separator"/>
    <addaction name="actionEdit"/>
+   <addaction name="actionLog_in"/>
+   <addaction name="separator"/>
+   <addaction name="actionTransfer"/>
+   <addaction name="actionLogout"/>
   </widget>
   <widget class="QDockWidget" name="leftWidget">
    <property name="minimumSize">
@@ -681,6 +685,33 @@
    </property>
    <property name="text">
     <string>Edit</string>
+   </property>
+  </action>
+  <action name="actionLog_in">
+   <property name="icon">
+    <iconset resource="menu.qrc">
+     <normaloff>:/File/images/up.png</normaloff>:/File/images/up.png</iconset>
+   </property>
+   <property name="text">
+    <string>Log in</string>
+   </property>
+  </action>
+  <action name="actionTransfer">
+   <property name="icon">
+    <iconset resource="menu.qrc">
+     <normaloff>:/File/images/newWnd.png</normaloff>:/File/images/newWnd.png</iconset>
+   </property>
+   <property name="text">
+    <string>transfer</string>
+   </property>
+  </action>
+  <action name="actionLogout">
+   <property name="icon">
+    <iconset resource="menu.qrc">
+     <normaloff>:/File/images/close.png</normaloff>:/File/images/close.png</iconset>
+   </property>
+   <property name="text">
+    <string>logout</string>
    </property>
   </action>
  </widget>

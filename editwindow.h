@@ -4,7 +4,9 @@
 #include <QMainWindow>
 #include <qtextedit.h>
 #include <keydialog.h>
+#include <string>
 
+using namespace std;
 namespace Ui {
 class EditWindow;
 }
@@ -16,6 +18,7 @@ class EditWindow : public QMainWindow
 public:
     explicit EditWindow(QWidget *parent = 0);
     keyDialog key;
+
     ~EditWindow();
 
 private slots:
@@ -25,10 +28,14 @@ private slots:
 
     void on_actionKey_triggered();
 
+    void setkey(char *);
+
 private:
     Ui::EditWindow *ui;
     void openFile();
     void saveFile();
+    int set_key;
+    string my_key;
     QAction * openAction;
     QAction * saveAction;
     QTextEdit * textEdit;

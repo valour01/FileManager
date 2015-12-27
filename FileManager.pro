@@ -19,7 +19,10 @@ SOURCES += main.cpp\
     editwindow.cpp \
     atrdialog.cpp \
     keydialog.cpp \
-    senddialog.cpp
+    senddialog.cpp \
+    logindialog.cpp \
+    popup.cpp \
+    pull_file.cpp
 
 HEADERS  += mainwindow.h \
     aboutdlg.h \
@@ -28,7 +31,11 @@ HEADERS  += mainwindow.h \
     editwindow.h \
     atrdialog.h \
     keydialog.h \
-    senddialog.h
+    senddialog.h \
+    smtp.h \
+    logindialog.h \
+    popup.h \
+    pull_file.h
 
 FORMS    += mainwindow.ui \
     aboutdlg.ui \
@@ -37,12 +44,17 @@ FORMS    += mainwindow.ui \
     editwindow.ui \
     atrdialog.ui \
     keydialog.ui \
-    senddialog.ui
+    senddialog.ui \
+    logindialog.ui \
+    popup.ui \
+    pull_file.ui
 
 RESOURCES += \
     menu.qrc
 
 LIBS += -L/usr/lib/x86_64-linux-gnu/ -lssh
+
+OTHER_FILES +=
 
 
 

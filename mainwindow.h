@@ -10,7 +10,15 @@
 #include <QWidget>
 #include <vector>
 #include "CFileNode.h"
+#include <logindialog.h>
 #include <QListWidgetItem>
+#include <popup.h>
+#define LIBSSH_STATIC 1
+#include <libssh/libssh.h>
+#include <libssh/sftp.h>
+#include <iostream>
+#include <errno.h>
+#include <pull_file.h>
 
 using namespace std;
 
@@ -29,14 +37,16 @@ public:
     atrdialog atrribute;
     EditWindow edit;
     sendDialog send;
-
+    LogInDialog login_dialog;
+    Popup popup;
+    pull_file pull_doc;
     //temp valuable
     vector<CFileNode*> result;//file dir
     vector<string> currentPath;//store current path
 
     //store filenode
     vector<CFileNode*> allFiles;
-
+    int login;
     vector<CFileNode*> makeCurrentFileDir(const char *dir);
     vector<CFileNode*> makeAllFileDir(const char *dir);
     void InitSearchWidget();
@@ -97,6 +107,20 @@ private slots:
 
     void on_Send_clicked();
 
+    void on_actionLog_in_triggered();
+
+    void Login(char * hostname,char*username,char*password, int port);
+
+    void Send(char * remote_filepath,char * email,char* path,char * name);
+
+    void get_file(char * remote_path,char * local_path);
+
+    int verify_knownhost(ssh_session session);
+
+    void on_actionTransfer_triggered();
+
+    void on_actionLogout_triggered();
+
 signals:
     void SignalsetFolderName(char * fname);
     void SignalsetFileName(char * name);
@@ -108,6 +132,7 @@ private:
     char sString[1000];
     char temp_paths[1000],temp_patht[1000];
     int mode = -1;
+    ssh_session my_ssh_session;
     void Copy(char * a, char * b);
     void d_copy(char * a, char * b);
     void mydelete(const char * del_name);

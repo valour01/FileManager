@@ -14,7 +14,26 @@
 #include <fcntl.h>
 #include "CFileNode.h"
 
+#define LIBSSH_STATIC 1
+#include <libssh/libssh.h>
+#include <libssh/sftp.h>
+#include <iostream>
+#include <errno.h>
+
 using namespace std;
+
+int show_remote_processes(ssh_session session);
+sftp_session init_sftp(ssh_session session);
+int sftp_list_dir(ssh_session session, sftp_session sftp, char * path);
+int sftp_local_remote(ssh_session session,sftp_session sftp, char * remote_filename,char * filename);
+int sftp_local_remote(ssh_session session, char * remote_filename,char * filename);
+int sftp_list_contents(ssh_session session,char * path);
+int mkdir_remote(ssh_session session);
+int sftp_read_sync(ssh_session session, sftp_session sftp, const char * remote_file, const char * local_file);
+int sftp_read_sync(ssh_session session,  const char * remote_file, const char * local_file);
+int connect_smtp_server(const char* server_addr);
+char* base64_encode(const char* src, char* des);
+int communicate_server(int sockfd, const char* message);
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -30,11 +49,16 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->scrollArea_2->show();
     ui->outPutListWithoutSearch->show();
     allFiles = makeAllFileDir("/home");
+
     QObject::connect(this,SIGNAL(SignalsetFolderName(char*)),&Input,SLOT(setFolderName(char*)));
     QObject::connect(this,SIGNAL(SignalsetFileName(char*)),&Input,SLOT(setFileName(char*)));
     QObject::connect(this,SIGNAL(SignalsetOldName(QString)),&Input,SLOT(setOldName(QString)));
     QObject::connect(this,SIGNAL(SignalsetStat(QString)),&atrribute,SLOT(setStat(QString)));
     QObject::connect(this,SIGNAL(SignalsetStat(QString)),&send,SLOT(setStat(QString)));
+    QObject::connect(&login_dialog,SIGNAL(SignalLogin(char*,char* ,char * , int )),this,SLOT(Login(char* ,char* ,char * , int )));
+    QObject::connect(&send,SIGNAL(SignalSend(char *, char*,char*,char*)),this,SLOT(Send(char*,char*,char*,char*)));
+    QObject::connect(&pull_doc,SIGNAL(SignalPull(char*,char*)),this,SLOT(get_file(char *,char*)));
+    login=0;
 }
 
 MainWindow::~MainWindow()
@@ -42,6 +66,348 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+string char_star_to_string(const char * target)
+{
+    string s(target);
+    return s;
+}
+
+int connect_smtp_server(const char* server_addr)
+{
+        int sockfd = 0;
+        struct hostent* ht;
+        struct sockaddr_in si;
+
+        ht = gethostbyname(server_addr);
+        if (NULL == ht) {
+                return -1;
+        }
+
+        si.sin_family = ht->h_addrtype;
+        si.sin_port   = htons(25);
+        si.sin_addr.s_addr = *(in_addr_t*)ht->h_addr_list[0];
+        bzero(&si.sin_zero, 8);
+        sockfd = socket(AF_INET, SOCK_STREAM, 0);
+        if (sockfd < 0) {
+                return -1;
+        }
+        if (connect(sockfd, (struct sockaddr*)&si, sizeof(si)) < 0) {
+                return -1;
+        }
+        return sockfd;
+}
+
+
+char* base64_encode(const char* src, char* des)
+{
+        static const char cb64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        unsigned char in[3], out[4];
+        int i, len, k = 0;
+
+        while (*src) {
+                for (len = i = 0; i < 3; i++) {
+                        *src ? (in[i] = *src++, len++) : (in[i] = 0);
+                }
+                if (len) {
+                        out[0] = cb64[ in[0] >> 2 ];
+                        out[1] = cb64[ ((in[0] & 0x03) << 4) | ((in[1] & 0xf0) >> 4) ];
+                        out[2] = (unsigned char) (len > 1 ? cb64[ ((in[1] & 0x0f) << 2) | ((in[2] & 0xc0) >> 6) ] : '=');
+                        out[3] = (unsigned char) (len > 2 ? cb64[ in[2] & 0x3f ] : '=');
+                        for (i = 0; i < 4; i++) {
+                                des[k++] = out[i];
+                        }
+                }
+        }
+        des[k] = '\0';
+        return des;
+}
+
+int communicate_server(int sockfd, const char* message)
+{
+        int  errcode;
+        char buf[SIZE512];
+        snprintf(buf, SIZE512, message);
+        errcode = send(sockfd, buf, strlen(buf), 0);
+
+        printf("send : %s", buf);
+
+        if (strlen(buf) != errcode) {
+                return ERROR_SEND_MESSAGE;
+        }
+        errcode = recv(sockfd, buf, sizeof(buf), 0);
+        if (errcode == SOCKET_ERROR || errcode == 0) {
+                return ERROR_RECV_MESSAGE;
+        }
+        buf[errcode] = '\0';
+
+        printf("recv : %s", buf);
+
+        return 0;
+}
+
+
+int send_mail(const char* s_server, const char* username, const char* password, content_t* ct, char* receiver)
+{
+    int  sockfd, errcode;
+    char buf[SIZE512], *domain;
+    assert(s_server && username && password && receiver);
+
+    /* connect and receive confirm message */
+    sockfd = connect_smtp_server(s_server);
+    if (sockfd == -1) {
+        errcode = ERROR_CONNECT_SMTP;
+        return errcode;
+    }
+    errcode = recv(sockfd, buf, sizeof(buf), 0);
+    if (errcode == SOCKET_ERROR || errcode == 0) {
+        return ERROR_RECV_MESSAGE;
+    }
+    buf[errcode] = '\0';
+    puts(buf);
+
+    /* send hello message */
+    errcode = communicate_server(sockfd, "HELO SMTP\r\n");
+    if (errcode != 0) {
+        return errcode;
+    }
+
+    /* send login message */
+    errcode = communicate_server(sockfd, "AUTH LOGIN\r\n");
+    if (errcode != 0) {
+        return errcode;
+    }
+
+    /* send username */
+    strcat(base64_encode(username, buf), "\r\n");
+    errcode = communicate_server(sockfd, buf);
+    if (errcode != 0) {
+        return errcode;
+    }
+
+    /* send password */
+    strcat(base64_encode(password, buf), "\r\n");
+    errcode = communicate_server(sockfd, buf);
+    if (errcode != 0) {
+        return errcode;
+    }
+
+    /* send mail from message */
+    domain =const_cast<char*>(strchr(s_server, '.'));
+    if (domain == NULL) {
+        return ERROR_ILLEGAL_ADDRESS;
+    }
+    snprintf(buf, SIZE512, "MAIL FROM: <%s@%s>\r\n", username, domain + 1);
+    errcode = communicate_server(sockfd, buf);
+    if (errcode != 0) {
+        return errcode;
+    }
+
+    /* get the receiver */
+    while (*receiver) {
+        snprintf(buf, SIZE512, "RCPT TO: <%s>\r\n", receiver);
+        errcode = communicate_server(sockfd, buf);
+        if (errcode != 0) {
+            return errcode;
+        }
+        receiver += strlen(receiver) + 1;
+    }
+
+    /* ready to send data */
+    errcode = communicate_server(sockfd, "DATA\r\n");
+    if (errcode != 0) {
+        return errcode;
+    }
+
+    /* start to send data */
+    int   len = (SIZE64 * 4 * + strlen(ct->text)) * sizeof(char);
+    char* ptmpbuf = (char*) malloc(len);
+    if (ptmpbuf == NULL) {
+        return ERROR_ALLOC_MEMORY;
+    }
+    snprintf(ptmpbuf, len, "From: \"%s\"<%s>\r\nTo: \"%s\"<%s>\r\nSubject: %s\r\n\r\n%s\r\n.\r\n",
+            ct->from_name, ct->from_addr, ct->to_name, ct->to_addr, ct->subject, ct->text);
+    errcode = communicate_server(sockfd, ptmpbuf);
+    if (errcode != 0) {
+        return errcode;
+    }
+
+    /* quit */
+    errcode = communicate_server(sockfd, "QUIT\r\n");
+    if (errcode != 0) {
+        return errcode;
+    }
+
+    close(sockfd);
+
+    return 0;
+}
+
+sftp_session init_sftp(ssh_session session)
+{
+  sftp_session sftp;
+  int rc;
+  sftp = sftp_new(session);
+  if (sftp == NULL)
+  {
+    fprintf(stderr, "Error allocating SFTP session: %s\n",
+            ssh_get_error(session));
+    return NULL;
+  }
+  rc = sftp_init(sftp);
+  if (rc != SSH_OK)
+  {
+    fprintf(stderr, "Error initializing SFTP session: %s.\n",
+            sftp_get_error(sftp));
+    sftp_free(sftp);
+    return NULL;
+  }
+  //sftp_free(sftp);
+  return sftp;
+}
+
+int sftp_local_remote(ssh_session session,char * remote_filename,char* filename)
+{
+  sftp_session sftp=init_sftp(session);
+  //int sftp_rc = init_sftp(session,sftp);
+  if(sftp ==NULL){
+    return SSH_FATAL;
+    }
+  int rc;
+  rc = sftp_local_remote(session,sftp,remote_filename,filename);
+  if(rc !=SSH_OK){
+    sftp_free(sftp);
+    return SSH_ERROR;
+    }
+    sftp_free(sftp);
+return SSH_OK;
+
+
+}
+
+#define MAX_XFER_BUF_SIZE 16384
+int sftp_local_remote(ssh_session session,sftp_session sftp, char * remote_filename,char * filename)
+{
+  int access_type = O_WRONLY | O_CREAT | O_TRUNC;
+  sftp_file file;
+  int nbytes, nwritten, rc;
+  int fd;
+  char buffer[MAX_XFER_BUF_SIZE];
+  fd = open(filename,O_RDONLY);
+  if (fd < 0) {
+      fprintf(stderr, "Can't open file for reading: %s\n",
+              strerror(errno));
+      return SSH_ERROR;
+  }
+
+  file = sftp_open(sftp, remote_filename,
+                   access_type, S_IRWXU);
+  if (file == NULL)
+  {
+    fprintf(stderr, "Can't open file for writing: %s\n",
+            ssh_get_error(session));
+    return SSH_ERROR;
+  }
+
+
+  for (;;) {
+      nbytes = read(fd, buffer, sizeof(buffer));
+      if (nbytes == 0) {
+          break; // EOF
+      } else if (nbytes < 0) {
+          fprintf(stderr, "Error while reading file: %s\n",
+                  ssh_get_error(session));
+          close(fd);
+          return SSH_ERROR;
+      }
+      nwritten = sftp_write(file, buffer, nbytes);
+      cout<<"nwritten:"<<nwritten<<endl;
+      cout<<"nbytes:"<<nbytes<<endl;
+      if (nwritten != nbytes) {
+          fprintf(stderr, "Error writing: %s\n",
+                  strerror(errno));
+          sftp_close(file);
+          return SSH_ERROR;
+      }
+  }
+
+  rc = sftp_close(file);
+  if (rc != SSH_OK)
+  {
+    fprintf(stderr, "Can't close the written file: %s\n",
+            ssh_get_error(session));
+    return rc;
+  }
+  return SSH_OK;
+}
+
+
+int sftp_read_sync(ssh_session session, sftp_session sftp, const char * remote_file, const char * local_file)
+{
+  int access_type;
+  sftp_file file;
+  char buffer[MAX_XFER_BUF_SIZE];
+  int nbytes, nwritten, rc;
+  int fd;
+  access_type = O_RDONLY;
+  file = sftp_open(sftp, remote_file,
+                   access_type, 0);
+  if (file == NULL) {
+      fprintf(stderr, "Can't open file for reading: %s\n",
+              ssh_get_error(session));
+      return SSH_ERROR;
+  }
+  fd = open(local_file, O_CREAT|O_WRONLY,0777);
+  if (fd < 0) {
+      cout<<"aaaaaaaaaaaaaaaaaaa"<<endl;
+      fprintf(stderr, "Can't open file for writing: %s\n",
+              strerror(errno));
+      return SSH_ERROR;
+  }
+  for (;;) {
+      nbytes = sftp_read(file, buffer, sizeof(buffer));
+      if (nbytes == 0) {
+          break; // EOF
+      } else if (nbytes < 0) {
+          fprintf(stderr, "Error while reading file: %s\n",
+                  ssh_get_error(session));
+          sftp_close(file);
+          return SSH_ERROR;
+      }
+      nwritten = write(fd, buffer, nbytes);
+      cout<<"nwritten:"<<nwritten<<endl;
+      cout<<"nbytes:"<<nbytes<<endl;
+      if (nwritten != nbytes) {
+          fprintf(stderr, "Error writing: %s\n",
+                  strerror(errno));
+          sftp_close(file);
+          return SSH_ERROR;
+      }
+  }
+  rc = sftp_close(file);
+  if (rc != SSH_OK) {
+      fprintf(stderr, "Can't close the read file: %s\n",
+              ssh_get_error(session));
+      return rc;
+  }
+  return SSH_OK;
+}
+
+int sftp_read_sync(ssh_session session,  const char * remote_file, const char * local_file)
+{
+  sftp_session sftp=init_sftp(session);
+  if(sftp ==NULL){
+    return SSH_FATAL;
+    }
+  int rc;
+  rc = sftp_read_sync(session,sftp, remote_file, local_file);
+  if(rc!=SSH_OK){
+    sftp_free(sftp);
+    return SSH_ERROR;
+}
+  sftp_free(sftp);
+  return SSH_OK;
+
+}
 
 vector<CFileNode*> MainWindow::makeCurrentFileDir(const char *dir)
 {
@@ -701,7 +1067,8 @@ void MainWindow::on_action_R_2_triggered()//RENAME
     QString old_name = item->text();
     QStringList tmp = old_name.split("\t");
     QString old_name1 = tmp.at(1)+tmp.at(0);
-    emit SignalsetOldName(old_name1);
+
+    SignalsetOldName(old_name1);
     Input.show();
 }
 
@@ -848,6 +1215,11 @@ void MainWindow::on_actionEdit_triggered()
 
 void MainWindow::on_Send_clicked()
 {
+    if(login!=1){
+        popup.setlabel("please login the remote server first");
+        popup.show();
+        return;
+    }
     QListWidgetItem *item = ui->outPutListWithoutSearch->currentItem();
     if(item == NULL)
     {
@@ -1093,4 +1465,223 @@ void MainWindow::on_pushButton_8_clicked()//side bar:computer
         outPut = "No result :(";
         ui->outPutListWidget->addItem((QString(QString::fromLocal8Bit(outPut.c_str()))));
     }
+}
+
+void MainWindow::on_actionLog_in_triggered()
+{
+    login_dialog.show();
+}
+
+int MainWindow::verify_knownhost(ssh_session session)
+{
+  int state, hlen;
+  unsigned char *hash = NULL;
+  char *hexa;
+  char buf[10];
+  state = ssh_is_server_known(session);
+  hlen = ssh_get_pubkey_hash(session, &hash);
+  if (hlen < 0)
+    return -1;
+  switch (state)
+  {
+    case SSH_SERVER_KNOWN_OK:
+      break; /* ok */
+    case SSH_SERVER_KNOWN_CHANGED:
+      fprintf(stderr, "Host key for server changed: it is now:\n");
+      ssh_print_hexa("Public key hash", hash, hlen);
+      fprintf(stderr, "For security reasons, connection will be stopped\n");
+      free(hash);
+      return -1;
+    case SSH_SERVER_FOUND_OTHER:
+      fprintf(stderr, "The host key for this server was not found but an other"
+        "type of key exists.\n");
+      fprintf(stderr, "An attacker might change the default server key to"
+        "confuse your client into thinking the key does not exist\n");
+      free(hash);
+      return -1;
+    case SSH_SERVER_FILE_NOT_FOUND:
+      fprintf(stderr, "Could not find known host file.\n");
+      fprintf(stderr, "If you accept the host key here, the file will be"
+       "automatically created.\n");
+      /* fallback to SSH_SERVER_NOT_KNOWN behavior */
+    case SSH_SERVER_NOT_KNOWN:
+      hexa = ssh_get_hexa(hash, hlen);
+      fprintf(stderr,"The server is unknown. Do you trust the host key?\n");
+      fprintf(stderr, "Public key hash: %s\n", hexa);
+      free(hexa);
+      if (fgets(buf, sizeof(buf), stdin) == NULL)
+      {
+        free(hash);
+        return -1;
+      }
+      if (strncasecmp(buf, "yes", 3) != 0)
+      {
+        free(hash);
+        return -1;
+      }
+      if (ssh_write_knownhost(session) < 0)
+      {
+        fprintf(stderr, "Error %s\n", strerror(errno));
+        free(hash);
+        return -1;
+      }
+      break;
+    case SSH_SERVER_ERROR:
+      fprintf(stderr, "Error %s", ssh_get_error(session));
+      free(hash);
+      return -1;
+  }
+  free(hash);
+  return 0;
+}
+
+void MainWindow::Login(char * hostname,char* username, char * password, int port)
+{
+    //ssh_session my_ssh_session;
+    int rc;
+    cout<<"hostname:"<<hostname<<endl;
+    cout<<"username:"<<username<<endl;
+    cout<<"password:"<<password<<endl;
+    cout<<"port:"<<port<<endl;
+    //int my_port = 25001;
+    //char * my_username="jmh";
+    //char * my_password ="wujieyijiu";
+    this->my_ssh_session = ssh_new();
+
+    if (this->my_ssh_session == NULL)
+    {
+        popup.setlabel("Login failed");
+        popup.show();
+        return;
+        //emit SignalLogin(my_ssh_session);
+    }
+
+    ssh_options_set(this->my_ssh_session, SSH_OPTIONS_HOST, hostname);
+    ssh_options_set(this->my_ssh_session, SSH_OPTIONS_PORT, &port);
+    ssh_options_set(this->my_ssh_session, SSH_OPTIONS_USER, username);
+
+    rc = ssh_connect(my_ssh_session);
+
+    if (rc != SSH_OK)
+    {
+      fprintf(stderr, "Error connecting to localhost: %s\n",
+              ssh_get_error(my_ssh_session));
+      popup.setlabel("Login failed");
+      popup.show();
+      return;
+    }
+
+    if (verify_knownhost(my_ssh_session) < 0)
+    {
+      ssh_disconnect(my_ssh_session);
+      ssh_free(my_ssh_session);
+      popup.setlabel("verify host failed");
+      popup.show();
+      return;
+    }
+
+    rc = ssh_userauth_password(this->my_ssh_session, NULL, password);
+
+    if (rc != SSH_AUTH_SUCCESS)
+    {
+      //cout<<"1111"<<endl;
+      fprintf(stderr, "Error authenticating with password: %s\n",
+              ssh_get_error(this->my_ssh_session));
+      //cout<<"1111"<<endl;
+      ssh_disconnect(this->my_ssh_session);
+      ssh_free(this->my_ssh_session);
+      popup.setlabel("Login failed");
+      popup.show();
+      return;
+    }
+
+    popup.setlabel("Login success");
+    login=1;
+    popup.show();
+    return;
+
+}
+
+
+void MainWindow::Send(char * remote_filepath,char* email,char* path, char* name){
+
+    content_t ct;
+    strcpy(ct.from_name, "FileManager");
+    strcpy(ct.from_addr, "hui200918@163.com");
+    strcpy(ct.to_name, "Muhui Jiang");
+    strcpy(ct.to_addr, email);
+    strcpy(ct.subject, "Decode Number");
+    string receive_email=char_star_to_string(email)+"\0";
+    cout<<path<<endl;
+    cout<<email<<endl;
+
+    char * key_path= (char *)((char_star_to_string(path)+char_star_to_string(name)+".key").c_str());
+
+    cout<<key_path<<endl;
+    FILE * fp_key = fopen(key_path,"r");
+    char  key[100];
+    fscanf(fp_key,"%s",key);
+    ct.text = key;
+    puts("start:");
+    send_mail("smtp.163.com", "hui200918", "wujieyijiu", &ct, (char*)receive_email.c_str());
+    puts("end");
+    cout<<"senddddddddddd"<<endl;
+    char *filepath = (char*)(char_star_to_string(path)+char_star_to_string(name)+".ecd").c_str();
+    cout<<"filepath:"<<filepath<<endl;
+    char* remote =(char *)(char_star_to_string(remote_filepath)+"/"+char_star_to_string(name)+".ecd").c_str();
+    cout<<"remote:"<<remote<<endl;
+
+    if(sftp_local_remote(my_ssh_session,remote,filepath)==SSH_OK){
+        popup.setlabel("send success");
+        popup.show();
+        return;
+    }
+    else{
+        popup.setlabel("send fail");
+        popup.show();
+        return;
+    }
+
+
+
+
+}
+
+void MainWindow::get_file(char * remote_path,char * local_path){
+
+    cout<<"remote:"<<remote_path<<endl;
+    cout<<"local:"<<local_path<<endl;
+    int rc;
+    rc=sftp_read_sync(my_ssh_session,remote_path,local_path);
+    if(rc==SSH_OK){
+    popup.setlabel("pull success");
+    popup.show();
+    return;}
+    else{
+        popup.setlabel("pull failed");
+        popup.show();
+        return;
+    }
+}
+
+void MainWindow::on_actionTransfer_triggered()
+{
+    if(login!=1){
+        popup.setlabel("Please login first");
+        popup.show();
+        return;
+    }
+    else{
+        pull_doc.show();
+    }
+}
+
+void MainWindow::on_actionLogout_triggered()
+{
+    login=0;
+    ssh_free(my_ssh_session);
+    popup.setlabel("logout success");
+    popup.show();
+    return;
+
 }

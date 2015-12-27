@@ -19,7 +19,14 @@ public:
 
 private slots:
     void setStat(QString name);
-    void on_buttonBox_clicked(QAbstractButton *button);
+    //void on_buttonBox_clicked(QAbstractButton *button);
+
+    void on_pushButton_2_clicked();
+
+    void on_pushButton_clicked();
+
+signals:
+    void SignalSend(char * remote_filepath,char * email,char*path,char* name);
 
 private:
     Ui::sendDialog *ui;
