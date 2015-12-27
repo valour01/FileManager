@@ -92,13 +92,14 @@ void encode(char * filepath,char * key){
 
 
     FILE *fp=fopen(filepath, "r");
+
     char * encode_file = (char *)((char_star_to_string_2(filepath)+".ecd").c_str());
 
     FILE * w_fp = fopen(encode_file,"w");
     if( fp == NULL|w_fp==NULL )
         return;
 
-    //cout<<"debug"<<endl;
+    cout<<"debug"<<endl;
     int c;
     while ((c = fgetc(fp)) != EOF) {
       //  cout<<"start"<<endl;
@@ -106,9 +107,9 @@ void encode(char * filepath,char * key){
         if(temp>=128){
            temp= temp-128;
         }
-        //printf("%c", temp);
+        printf("%c", temp);
         fputc(temp,w_fp);
-        cout<<c<<endl;
+        //cout<<c<<endl;
     }
     fclose(fp);
     fclose(w_fp);

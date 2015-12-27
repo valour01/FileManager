@@ -25,12 +25,12 @@ using namespace std;
 int show_remote_processes(ssh_session session);
 sftp_session init_sftp(ssh_session session);
 int sftp_list_dir(ssh_session session, sftp_session sftp, char * path);
-int sftp_local_remote(ssh_session session,sftp_session sftp, char * remote_filename,char * filename);
-int sftp_local_remote(ssh_session session, char * remote_filename,char * filename);
+int sftp_local_remote(ssh_session session,sftp_session sftp, string remote_filename,string filename);
+int sftp_local_remote(ssh_session session, string remote_filename,string filename);
 int sftp_list_contents(ssh_session session,char * path);
 int mkdir_remote(ssh_session session);
-int sftp_read_sync(ssh_session session, sftp_session sftp, const char * remote_file, const char * local_file);
-int sftp_read_sync(ssh_session session,  const char * remote_file, const char * local_file);
+int sftp_read_sync(ssh_session session, sftp_session sftp, string remote_file, string local_file);
+int sftp_read_sync(ssh_session session,  string remote_file,string local_file);
 int connect_smtp_server(const char* server_addr);
 char* base64_encode(const char* src, char* des);
 int communicate_server(int sockfd, const char* message);
@@ -265,7 +265,7 @@ sftp_session init_sftp(ssh_session session)
   return sftp;
 }
 
-int sftp_local_remote(ssh_session session,char * remote_filename,char* filename)
+int sftp_local_remote(ssh_session session,string remote_filename,string filename)
 {
   sftp_session sftp=init_sftp(session);
   //int sftp_rc = init_sftp(session,sftp);
@@ -285,21 +285,22 @@ return SSH_OK;
 }
 
 #define MAX_XFER_BUF_SIZE 16384
-int sftp_local_remote(ssh_session session,sftp_session sftp, char * remote_filename,char * filename)
+int sftp_local_remote(ssh_session session,sftp_session sftp, string remote_filename,string filename)
 {
-  int access_type = O_WRONLY | O_CREAT | O_TRUNC;
+  int access_type = O_WRONLY | O_CREAT;
   sftp_file file;
   int nbytes, nwritten, rc;
   int fd;
   char buffer[MAX_XFER_BUF_SIZE];
-  fd = open(filename,O_RDONLY);
+  cout<<"filename"<<filename<<endl;
+  fd = open(filename.c_str(),O_RDONLY |O_CREAT);
   if (fd < 0) {
       fprintf(stderr, "Can't open file for reading: %s\n",
               strerror(errno));
       return SSH_ERROR;
   }
 
-  file = sftp_open(sftp, remote_filename,
+  file = sftp_open(sftp, remote_filename.c_str(),
                    access_type, S_IRWXU);
   if (file == NULL)
   {
@@ -341,7 +342,7 @@ int sftp_local_remote(ssh_session session,sftp_session sftp, char * remote_filen
 }
 
 
-int sftp_read_sync(ssh_session session, sftp_session sftp, const char * remote_file, const char * local_file)
+int sftp_read_sync(ssh_session session, sftp_session sftp, string remote_file, string local_file)
 {
   int access_type;
   sftp_file file;
@@ -349,14 +350,15 @@ int sftp_read_sync(ssh_session session, sftp_session sftp, const char * remote_f
   int nbytes, nwritten, rc;
   int fd;
   access_type = O_RDONLY;
-  file = sftp_open(sftp, remote_file,
+  file = sftp_open(sftp, remote_file.c_str(),
                    access_type, 0);
   if (file == NULL) {
       fprintf(stderr, "Can't open file for reading: %s\n",
               ssh_get_error(session));
       return SSH_ERROR;
   }
-  fd = open(local_file, O_CREAT|O_WRONLY,0777);
+  fd = open(local_file.c_str(), O_CREAT | O_RDWR | O_TRUNC,0777);
+  cout<<"local:"<<local_file<<endl;
   if (fd < 0) {
       cout<<"aaaaaaaaaaaaaaaaaaa"<<endl;
       fprintf(stderr, "Can't open file for writing: %s\n",
@@ -392,7 +394,7 @@ int sftp_read_sync(ssh_session session, sftp_session sftp, const char * remote_f
   return SSH_OK;
 }
 
-int sftp_read_sync(ssh_session session,  const char * remote_file, const char * local_file)
+int sftp_read_sync(ssh_session session,  string remote_file, string local_file)
 {
   sftp_session sftp=init_sftp(session);
   if(sftp ==NULL){
@@ -1619,6 +1621,11 @@ void MainWindow::Send(char * remote_filepath,char* email,char* path, char* name)
 
     cout<<key_path<<endl;
     FILE * fp_key = fopen(key_path,"r");
+    if(fp_key ==NULL){
+        popup.setlabel("send fail");
+        popup.show();
+        return;
+    }
     char  key[100];
     fscanf(fp_key,"%s",key);
     ct.text = key;
@@ -1626,12 +1633,13 @@ void MainWindow::Send(char * remote_filepath,char* email,char* path, char* name)
     send_mail("smtp.163.com", "hui200918", "wujieyijiu", &ct, (char*)receive_email.c_str());
     puts("end");
     cout<<"senddddddddddd"<<endl;
-    char *filepath = (char*)(char_star_to_string(path)+char_star_to_string(name)+".ecd").c_str();
+    string filepath = char_star_to_string(path)+char_star_to_string(name)+".ecd";
     cout<<"filepath:"<<filepath<<endl;
-    char* remote =(char *)(char_star_to_string(remote_filepath)+"/"+char_star_to_string(name)+".ecd").c_str();
+    string remote =char_star_to_string(remote_filepath)+"/"+char_star_to_string(name)+".ecd";
     cout<<"remote:"<<remote<<endl;
-
-    if(sftp_local_remote(my_ssh_session,remote,filepath)==SSH_OK){
+    string remote_decode =char_star_to_string(remote_filepath)+"/decode";
+    cout<< remote_decode<<endl;
+    if((sftp_local_remote(my_ssh_session,remote,filepath)==SSH_OK)||(sftp_local_remote(my_ssh_session,remote_decode,"/home/jmh/decode")==SSH_OK)){
         popup.setlabel("send success");
         popup.show();
         return;
@@ -1652,7 +1660,7 @@ void MainWindow::get_file(char * remote_path,char * local_path){
     cout<<"remote:"<<remote_path<<endl;
     cout<<"local:"<<local_path<<endl;
     int rc;
-    rc=sftp_read_sync(my_ssh_session,remote_path,local_path);
+    rc=sftp_read_sync(my_ssh_session,char_star_to_string(remote_path),char_star_to_string(local_path));
     if(rc==SSH_OK){
     popup.setlabel("pull success");
     popup.show();
