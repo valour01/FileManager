@@ -56,7 +56,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect(this,SIGNAL(SignalsetStat(QString)),&atrribute,SLOT(setStat(QString)));
     QObject::connect(this,SIGNAL(SignalsetStat(QString)),&send,SLOT(setStat(QString)));
     QObject::connect(&login_dialog,SIGNAL(SignalLogin(char*,char* ,char * , int )),this,SLOT(Login(char* ,char* ,char * , int )));
-    QObject::connect(&send,SIGNAL(SignalSend(char *, char*,char*,char*)),this,SLOT(Send(char*,char*,char*,char*)));
+    QObject::connect(&send,SIGNAL(SignalSend(char *, char*,char*,char*,bool)),this,SLOT(Send(char*,char*,char*,char*,bool)));
     QObject::connect(&pull_doc,SIGNAL(SignalPull(char*,char*)),this,SLOT(get_file(char *,char*)));
     login=0;
 }
@@ -1605,7 +1605,7 @@ void MainWindow::Login(char * hostname,char* username, char * password, int port
 }
 
 
-void MainWindow::Send(char * remote_filepath,char* email,char* path, char* name){
+void MainWindow::Send(char * remote_filepath,char* email,char* path, char* name,bool encoded){
 
     content_t ct;
     strcpy(ct.from_name, "FileManager");
@@ -1614,32 +1614,45 @@ void MainWindow::Send(char * remote_filepath,char* email,char* path, char* name)
     strcpy(ct.to_addr, email);
     strcpy(ct.subject, "Decode Number");
     string receive_email=char_star_to_string(email)+"\0";
-    cout<<path<<endl;
-    cout<<email<<endl;
 
-    char * key_path= (char *)((char_star_to_string(path)+char_star_to_string(name)+".key").c_str());
 
-    cout<<key_path<<endl;
-    FILE * fp_key = fopen(key_path,"r");
-    if(fp_key ==NULL){
-        popup.setlabel("send fail");
-        popup.show();
-        return;
-    }
-    char  key[100];
-    fscanf(fp_key,"%s",key);
-    ct.text = key;
-    puts("start:");
-    send_mail("smtp.163.com", "hui200918", "wujieyijiu", &ct, (char*)receive_email.c_str());
-    puts("end");
-    cout<<"senddddddddddd"<<endl;
-    string filepath = char_star_to_string(path)+char_star_to_string(name)+".ecd";
-    cout<<"filepath:"<<filepath<<endl;
-    string remote =char_star_to_string(remote_filepath)+"/"+char_star_to_string(name)+".ecd";
-    cout<<"remote:"<<remote<<endl;
-    string remote_decode =char_star_to_string(remote_filepath)+"/decode";
-    cout<< remote_decode<<endl;
-    if((sftp_local_remote(my_ssh_session,remote,filepath)==SSH_OK)||(sftp_local_remote(my_ssh_session,remote_decode,"/home/jmh/decode")==SSH_OK)){
+    if(encoded==0){
+        string filepath = char_star_to_string(path)+char_star_to_string(name);
+        cout<<"filepath:"<<filepath<<endl;
+        string remote =char_star_to_string(remote_filepath)+"/"+char_star_to_string(name);
+        cout<<"remote:"<<remote<<endl;
+        if((sftp_local_remote(my_ssh_session,remote,filepath)==SSH_OK)){
+            popup.setlabel("send success");
+            popup.show();
+            return;
+        }
+        else{
+            popup.setlabel("send fail");
+            popup.show();
+            return;
+        }
+
+    }else{
+        char * key_path= (char *)((char_star_to_string(path)+char_star_to_string(name)+".key").c_str());
+
+        cout<<key_path<<endl;
+        FILE * fp_key = fopen(key_path,"r");
+        if(fp_key ==NULL){
+            popup.setlabel("send fail");
+            popup.show();
+            return;
+        }
+        char  key[100];
+        fscanf(fp_key,"%s",key);
+        ct.text = key;
+        send_mail("smtp.163.com", "hui200918", "wujieyijiu", &ct, (char*)receive_email.c_str());
+        string filepath = char_star_to_string(path)+char_star_to_string(name)+".ecd";
+        cout<<"filepath:"<<filepath<<endl;
+        string remote =char_star_to_string(remote_filepath)+"/"+char_star_to_string(name)+".ecd";
+        cout<<"remote:"<<remote<<endl;
+        string remote_decode =char_star_to_string(remote_filepath)+"/decode";
+        cout<< remote_decode<<endl;
+    if((sftp_local_remote(my_ssh_session,remote,filepath)==SSH_OK)&&(sftp_local_remote(my_ssh_session,remote_decode,"/usr/local/src/decode")==SSH_OK)){
         popup.setlabel("send success");
         popup.show();
         return;
@@ -1648,6 +1661,7 @@ void MainWindow::Send(char * remote_filepath,char* email,char* path, char* name)
         popup.setlabel("send fail");
         popup.show();
         return;
+    }
     }
 
 

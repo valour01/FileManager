@@ -26,7 +26,7 @@ private slots:
     void on_pushButton_clicked();
 
 signals:
-    void SignalSend(char * remote_filepath,char * email,char*path,char* name);
+    void SignalSend(char * remote_filepath,char * email,char*path,char* name,bool encoded);
 
 private:
     Ui::sendDialog *ui;

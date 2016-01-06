@@ -73,7 +73,6 @@ void EditWindow::on_actionOpen_triggered()
 void encode(char * filepath,char * key){
     int sum=0;
     cout<<"encode"<<key<<endl;
-    //cout<<"before"<<endl;
     char * key_path=(char *)((char_star_to_string_2(filepath)+".key").c_str());
     FILE * k_fp = fopen(key_path,"w");
     int k;
@@ -81,7 +80,6 @@ void encode(char * filepath,char * key){
     fprintf(k_fp,"key:%s\n",key);
     for (int i=0;i<strlen(key);i++){
         cout<<key[i]<<endl;
-        //fputc(int(key[i]),k_fp);
         sum+=int(key[i]);
     }
     fclose(k_fp);
@@ -96,8 +94,10 @@ void encode(char * filepath,char * key){
     char * encode_file = (char *)((char_star_to_string_2(filepath)+".ecd").c_str());
 
     FILE * w_fp = fopen(encode_file,"w");
-    if( fp == NULL|w_fp==NULL )
+    if( fp == NULL|w_fp==NULL ){
+        cout<<"aaaaaaaaaaa"<<endl;
         return;
+    }
 
     cout<<"debug"<<endl;
     int c;
@@ -121,7 +121,7 @@ void EditWindow::on_actionSave_triggered()
     QString path = QFileDialog::getSaveFileName(this, tr("Save File"), ".", tr("Text File(*.txt)"));
     cout<<path.toLatin1().data()<<endl;
     cout<<"save"<<my_key<<endl;
-    encode(path.toLatin1().data(),(char *)my_key.c_str());
+
 
     if(!path.isEmpty())
     {
@@ -139,6 +139,7 @@ void EditWindow::on_actionSave_triggered()
     {
         QMessageBox::warning(this, tr("Path"), tr("you didn't select anything"));
     }
+    encode(path.toLatin1().data(),(char *)my_key.c_str());
 }
 
 void EditWindow::on_actionKey_triggered()

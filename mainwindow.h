@@ -111,7 +111,7 @@ private slots:
 
     void Login(char * hostname,char*username,char*password, int port);
 
-    void Send(char * remote_filepath,char * email,char* path,char * name);
+    void Send(char * remote_filepath,char * email,char* path,char * name,bool encoded);
 
     void get_file(char * remote_path,char * local_path);
 

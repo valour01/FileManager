@@ -192,8 +192,9 @@ void sendDialog::on_pushButton_2_clicked()
     QString ftext4 = ui->name->text();
     QByteArray name_array = ftext4.toLatin1();
     char * name = name_array.data();
-
-    emit SignalSend(remote_filepath,email,path,name);
+    bool encoded = ui->checkBox->isChecked();
+    //cout<<"checkbox:"<<checked<<endl;
+    emit SignalSend(remote_filepath,email,path,name,encoded);
     ui->filepath->clear();
     ui->email->clear();
     this->hide();
