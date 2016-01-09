@@ -139,7 +139,9 @@ void EditWindow::on_actionSave_triggered()
     {
         QMessageBox::warning(this, tr("Path"), tr("you didn't select anything"));
     }
+    if(set_key==1){
     encode(path.toLatin1().data(),(char *)my_key.c_str());
+}
 }
 
 void EditWindow::on_actionKey_triggered()
